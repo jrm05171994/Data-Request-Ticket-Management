@@ -1,5 +1,5 @@
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
-import type { Database } from "@/lib/supabase/types";
+import type { Database, RequestType, Stage } from "@/lib/supabase/types";
 
 type TicketRow = Database["public"]["Tables"]["tickets"]["Row"];
 type UserMini = { id: string; email: string; full_name: string | null };
@@ -15,6 +15,7 @@ export type TicketListed = Pick<
   | "created_at"
   | "owner_id"
   | "requester_id"
+  | "request_type"
 > & {
   owner: UserMini | null;
   requester: UserMini | null;
@@ -25,9 +26,16 @@ export type TicketDetail = TicketRow & {
   requester: UserMini | null;
 };
 
+export type AdminQueueFilters = {
+  stages: Stage[] | null;
+  types: RequestType[] | null;
+  requesterId: string | null;
+  late: boolean;
+};
+
 const LIST_SELECT = `
   id, request_name, stage, priority_rank, priority_score,
-  expected_completion_date, created_at, owner_id, requester_id,
+  expected_completion_date, created_at, owner_id, requester_id, request_type,
   owner:owner_id ( id, email, full_name ),
   requester:requester_id ( id, email, full_name )
 `;
@@ -76,15 +84,31 @@ export async function listMyTickets(userId: string) {
 }
 
 /**
- * Admin queue: every ticket, ranked. Same shape as listMyTickets but
- * relies on the caller already being an admin (RLS still enforces it).
- * Open tickets first by rank, then completed tickets by completion date.
+ * Admin queue: every ticket with optional filters. RLS still enforces admin.
+ * Open tickets first by rank, then completed tickets by created_at.
  */
-export async function listAllTicketsForAdmin() {
+export async function listAllTicketsForAdmin(filters?: Partial<AdminQueueFilters>) {
   const supabase = createClient();
-  return supabase
-    .from("tickets")
-    .select(LIST_SELECT)
+  let query = supabase.from("tickets").select(LIST_SELECT);
+
+  if (filters?.stages && filters.stages.length > 0) {
+    query = query.in("stage", filters.stages);
+  }
+  if (filters?.types && filters.types.length > 0) {
+    query = query.in("request_type", filters.types);
+  }
+  if (filters?.requesterId) {
+    query = query.eq("requester_id", filters.requesterId);
+  }
+  if (filters?.late) {
+    // open + has ETA + ETA in the past
+    query = query
+      .neq("stage", "completed")
+      .not("expected_completion_date", "is", null)
+      .lt("expected_completion_date", new Date().toISOString().slice(0, 10));
+  }
+
+  return query
     .order("priority_rank", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false })
     .returns<TicketListed[]>();

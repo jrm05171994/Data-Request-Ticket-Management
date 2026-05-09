@@ -8,7 +8,7 @@ import {
   getRequestTypeCounts,
   getStageCounts,
   getTopRequesters,
-  type DateRange,
+  type AnalyticsFilters,
 } from "@/lib/analytics/queries";
 import {
   REQUEST_TYPE_LABELS,
@@ -18,20 +18,65 @@ import {
 import { AppHeader } from "@/components/app-header";
 import { BarRow } from "@/components/admin/analytics/bar-row";
 import { DateRangeFilter } from "@/components/admin/analytics/date-range-filter";
-import type { Stage } from "@/lib/supabase/types";
+import { RequestTypeFilter } from "@/components/admin/analytics/request-type-filter";
+import type { RequestType, Stage } from "@/lib/supabase/types";
 
-type SearchParams = { from?: string; to?: string };
+type SearchParams = { from?: string; to?: string; types?: string };
 
-function parseRange(searchParams: SearchParams): DateRange {
-  const from = searchParams.from && searchParams.from.length === 10 ? `${searchParams.from}T00:00:00Z` : null;
-  // Inclusive end: bump to next day's 00:00 so the filter behaves intuitively.
+const VALID_REQUEST_TYPES: ReadonlyArray<RequestType> = [
+  "risk_scoring",
+  "new_dashboard",
+  "new_visual",
+  "new_analysis",
+  "update_existing",
+  "other",
+];
+
+function parseFilters(searchParams: SearchParams): AnalyticsFilters {
+  const from =
+    searchParams.from && searchParams.from.length === 10
+      ? `${searchParams.from}T00:00:00Z`
+      : null;
   let to: string | null = null;
   if (searchParams.to && searchParams.to.length === 10) {
     const d = new Date(`${searchParams.to}T00:00:00Z`);
     d.setUTCDate(d.getUTCDate() + 1);
     to = d.toISOString();
   }
-  return { from, to };
+
+  const requestTypes = searchParams.types
+    ? (searchParams.types
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s): s is RequestType =>
+          VALID_REQUEST_TYPES.includes(s as RequestType),
+        ) as RequestType[])
+    : null;
+
+  return { from, to, requestTypes };
+}
+
+/** Build a /admin/queue URL preserving any analytics filters as queue filters. */
+function queueHref(
+  base: { stages?: Stage[]; types?: RequestType[]; requesterId?: string; late?: boolean },
+  carry: AnalyticsFilters,
+): string {
+  const params = new URLSearchParams();
+  if (base.stages?.length) params.set("stages", base.stages.join(","));
+
+  // Combine analytics-level type filter with any explicit drill-down type
+  const types = base.types?.length
+    ? base.types
+    : carry.requestTypes && carry.requestTypes.length > 0
+      ? carry.requestTypes
+      : [];
+  if (types.length > 0) params.set("types", types.join(","));
+
+  if (base.requesterId) params.set("requester", base.requesterId);
+  if (base.late) params.set("late", "true");
+
+  const qs = params.toString();
+  return qs ? `/admin/queue?${qs}` : "/admin/queue";
 }
 
 export default async function AdminAnalyticsPage({
@@ -40,7 +85,7 @@ export default async function AdminAnalyticsPage({
   searchParams: SearchParams;
 }) {
   await requireAdmin();
-  const range = parseRange(searchParams);
+  const filters = parseFilters(searchParams);
 
   const [
     { data: kpis, error: kpisError },
@@ -50,12 +95,12 @@ export default async function AdminAnalyticsPage({
     { data: avgPerStage, error: avgErr },
     { data: lateList, error: lateErr },
   ] = await Promise.all([
-    getKpis(range),
-    getStageCounts(range),
-    getRequestTypeCounts(range),
-    getTopRequesters(range, 10),
-    getAvgTimePerStage(range),
-    getLateTickets(range),
+    getKpis(filters),
+    getStageCounts(filters),
+    getRequestTypeCounts(filters),
+    getTopRequesters(filters, 10),
+    getAvgTimePerStage(filters),
+    getLateTickets(filters),
   ]);
 
   const anyError =
@@ -79,7 +124,10 @@ export default async function AdminAnalyticsPage({
   >(
     (avgPerStage ?? []).map((r) => [
       r.stage,
-      { avg: r.avg_seconds == null ? null : Number(r.avg_seconds), samples: Number(r.sample_count) },
+      {
+        avg: r.avg_seconds == null ? null : Number(r.avg_seconds),
+        samples: Number(r.sample_count),
+      },
     ]),
   );
 
@@ -92,13 +140,23 @@ export default async function AdminAnalyticsPage({
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Analytics</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Operational view of request volume, completion rate, and bottlenecks.
+              Operational view of request volume, completion rate, and bottlenecks. Click any
+              metric to drill into the ticket queue.
             </p>
           </div>
         </div>
 
-        <div className="mt-4">
-          <DateRangeFilter from={searchParams.from ?? null} to={searchParams.to ?? null} />
+        <div className="mt-4 space-y-3">
+          <DateRangeFilter
+            from={searchParams.from ?? null}
+            to={searchParams.to ?? null}
+            types={searchParams.types ?? null}
+          />
+          <RequestTypeFilter
+            selected={filters.requestTypes ?? []}
+            from={searchParams.from ?? null}
+            to={searchParams.to ?? null}
+          />
         </div>
 
         {anyError ? (
@@ -107,15 +165,31 @@ export default async function AdminAnalyticsPage({
           </div>
         ) : null}
 
-        {/* KPI cards ---------------------------------------------------- */}
+        {/* KPI cards (clickable) ---------------------------------------- */}
         <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <Kpi label="Total" value={kpis?.total_tickets ?? 0} />
-          <Kpi label="Open" value={kpis?.open_tickets ?? 0} />
-          <Kpi label="Completed" value={kpis?.completed_tickets ?? 0} />
+          <Kpi
+            label="Total"
+            value={kpis?.total_tickets ?? 0}
+            href={queueHref({}, filters)}
+          />
+          <Kpi
+            label="Open"
+            value={kpis?.open_tickets ?? 0}
+            href={queueHref(
+              { stages: ["submitted", "received", "in_progress"] },
+              filters,
+            )}
+          />
+          <Kpi
+            label="Completed"
+            value={kpis?.completed_tickets ?? 0}
+            href={queueHref({ stages: ["completed"] }, filters)}
+          />
           <Kpi
             label="Late"
             value={kpis?.late_tickets ?? 0}
             tone={kpis && kpis.late_tickets > 0 ? "warn" : "neutral"}
+            href={queueHref({ late: true }, filters)}
           />
           <Kpi
             label="Avg time to complete"
@@ -133,6 +207,11 @@ export default async function AdminAnalyticsPage({
                 value={stageMap.get(s) ?? 0}
                 max={stageMax}
                 colorClass={stageBarColor(s)}
+                href={
+                  (stageMap.get(s) ?? 0) > 0
+                    ? queueHref({ stages: [s] }, filters)
+                    : undefined
+                }
               />
             ))}
           </Card>
@@ -148,6 +227,7 @@ export default async function AdminAnalyticsPage({
                   value={Number(row.ticket_count)}
                   max={typeMax}
                   colorClass="bg-indigo-500"
+                  href={queueHref({ types: [row.request_type] }, filters)}
                 />
               ))
             )}
@@ -160,7 +240,10 @@ export default async function AdminAnalyticsPage({
             {stageOrder.map((s) => {
               const entry = avgStageMap.get(s);
               return (
-                <div key={s} className="flex items-center justify-between border-b border-slate-100 py-2 last:border-0">
+                <div
+                  key={s}
+                  className="flex items-center justify-between border-b border-slate-100 py-2 last:border-0"
+                >
                   <div className="flex items-center gap-2">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STAGE_COLORS[s]}`}
@@ -168,7 +251,8 @@ export default async function AdminAnalyticsPage({
                       {STAGE_LABELS[s]}
                     </span>
                     <span className="text-xs text-slate-500">
-                      {entry?.samples ?? 0} sample{entry?.samples === 1 ? "" : "s"}
+                      {entry?.samples ?? 0} sample
+                      {entry?.samples === 1 ? "" : "s"}
                     </span>
                   </div>
                   <span className="text-sm font-medium tabular-nums text-slate-800">
@@ -193,6 +277,7 @@ export default async function AdminAnalyticsPage({
                   value={Number(r.ticket_count)}
                   max={requesterMax}
                   colorClass="bg-emerald-500"
+                  href={queueHref({ requesterId: r.requester_id }, filters)}
                 />
               ))
             )}
@@ -269,18 +354,20 @@ function Kpi({
   value,
   valueText,
   tone = "neutral",
+  href,
 }: {
   label: string;
   value?: number;
   valueText?: string;
   tone?: "neutral" | "warn";
+  href?: string;
 }) {
-  return (
+  const inner = (
     <div
-      className={`rounded-2xl p-4 shadow-sm ring-1 ${
+      className={`rounded-2xl p-4 shadow-sm ring-1 transition ${
         tone === "warn"
-          ? "bg-red-50 ring-red-100"
-          : "bg-white ring-slate-200"
+          ? "bg-red-50 ring-red-100 hover:ring-red-200"
+          : "bg-white ring-slate-200 hover:ring-slate-300"
       }`}
     >
       <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -295,6 +382,13 @@ function Kpi({
       </div>
     </div>
   );
+
+  if (!href) return inner;
+  return (
+    <Link href={href} className="block">
+      {inner}
+    </Link>
+  );
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -306,7 +400,13 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function Th({ children, className }: { children: React.ReactNode; className?: string }) {
+function Th({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <th
       scope="col"
@@ -324,7 +424,9 @@ function Td({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <td className={`px-4 py-2 align-middle ${className ?? ""}`}>{children}</td>;
+  return (
+    <td className={`px-4 py-2 align-middle ${className ?? ""}`}>{children}</td>
+  );
 }
 
 function stageBarColor(s: Stage): string {

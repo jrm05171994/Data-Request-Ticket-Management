@@ -1,5 +1,5 @@
-// URL-driven date range filter. Server-rendered.
-// Uses a plain GET form so the page reloads with new searchParams.
+// URL-driven date range filter. Preserves the existing `types` param so
+// the request-type filter doesn't get wiped when the date range changes.
 
 import Link from "next/link";
 
@@ -20,12 +20,25 @@ function isoNDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function presetHref(days: number | null, types: string | null): string {
+  const params = new URLSearchParams();
+  if (days != null) {
+    params.set("from", isoNDaysAgo(days));
+    params.set("to", todayIso());
+  }
+  if (types) params.set("types", types);
+  const qs = params.toString();
+  return qs ? `/admin/analytics?${qs}` : "/admin/analytics";
+}
+
 export function DateRangeFilter({
   from,
   to,
+  types,
 }: {
   from: string | null;
   to: string | null;
+  types?: string | null;
 }) {
   const today = todayIso();
 
@@ -60,6 +73,8 @@ export function DateRangeFilter({
             className="form-input mt-1 w-44"
           />
         </label>
+        {/* Preserve types filter when applying new dates via the form */}
+        {types ? <input type="hidden" name="types" value={types} /> : null}
         <button
           type="submit"
           className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
@@ -72,11 +87,7 @@ export function DateRangeFilter({
         {PRESETS.map((p) => (
           <Link
             key={p.label}
-            href={
-              p.days == null
-                ? "/admin/analytics"
-                : `/admin/analytics?from=${isoNDaysAgo(p.days)}&to=${today}`
-            }
+            href={presetHref(p.days, types ?? null)}
             className="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-600 hover:bg-slate-50"
           >
             {p.label}

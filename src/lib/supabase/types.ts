@@ -108,17 +108,26 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       analytics_stage_counts: {
-        Args: { date_from?: string | null; date_to?: string | null };
+        Args: {
+          date_from?: string | null;
+          date_to?: string | null;
+          request_types?: string[] | null;
+        };
         Returns: { stage: Stage; ticket_count: number }[];
       };
       analytics_request_type_counts: {
-        Args: { date_from?: string | null; date_to?: string | null };
+        Args: {
+          date_from?: string | null;
+          date_to?: string | null;
+          request_types?: string[] | null;
+        };
         Returns: { request_type: RequestType; ticket_count: number }[];
       };
       analytics_top_requesters: {
         Args: {
           date_from?: string | null;
           date_to?: string | null;
+          request_types?: string[] | null;
           limit_to?: number;
         };
         Returns: {
@@ -129,7 +138,11 @@ export type Database = {
         }[];
       };
       analytics_kpis: {
-        Args: { date_from?: string | null; date_to?: string | null };
+        Args: {
+          date_from?: string | null;
+          date_to?: string | null;
+          request_types?: string[] | null;
+        };
         Returns: {
           total_tickets: number;
           open_tickets: number;
@@ -139,7 +152,11 @@ export type Database = {
         }[];
       };
       analytics_avg_time_per_stage: {
-        Args: { date_from?: string | null; date_to?: string | null };
+        Args: {
+          date_from?: string | null;
+          date_to?: string | null;
+          request_types?: string[] | null;
+        };
         Returns: {
           stage: Stage;
           avg_seconds: number | null;
@@ -147,7 +164,11 @@ export type Database = {
         }[];
       };
       analytics_late_tickets: {
-        Args: { date_from?: string | null; date_to?: string | null };
+        Args: {
+          date_from?: string | null;
+          date_to?: string | null;
+          request_types?: string[] | null;
+        };
         Returns: {
           id: string;
           request_name: string;
