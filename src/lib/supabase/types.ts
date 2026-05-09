@@ -106,7 +106,59 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      analytics_stage_counts: {
+        Args: { date_from?: string | null; date_to?: string | null };
+        Returns: { stage: Stage; ticket_count: number }[];
+      };
+      analytics_request_type_counts: {
+        Args: { date_from?: string | null; date_to?: string | null };
+        Returns: { request_type: RequestType; ticket_count: number }[];
+      };
+      analytics_top_requesters: {
+        Args: {
+          date_from?: string | null;
+          date_to?: string | null;
+          limit_to?: number;
+        };
+        Returns: {
+          requester_id: string;
+          email: string;
+          full_name: string | null;
+          ticket_count: number;
+        }[];
+      };
+      analytics_kpis: {
+        Args: { date_from?: string | null; date_to?: string | null };
+        Returns: {
+          total_tickets: number;
+          open_tickets: number;
+          completed_tickets: number;
+          late_tickets: number;
+          avg_completion_seconds: number | null;
+        }[];
+      };
+      analytics_avg_time_per_stage: {
+        Args: { date_from?: string | null; date_to?: string | null };
+        Returns: {
+          stage: Stage;
+          avg_seconds: number | null;
+          sample_count: number;
+        }[];
+      };
+      analytics_late_tickets: {
+        Args: { date_from?: string | null; date_to?: string | null };
+        Returns: {
+          id: string;
+          request_name: string;
+          stage: Stage;
+          expected_completion_date: string;
+          days_late: number;
+          requester_email: string;
+          requester_full_name: string | null;
+        }[];
+      };
+    };
     Enums: {
       role: Role;
       stakeholder_type: StakeholderType;

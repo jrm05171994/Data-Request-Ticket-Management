@@ -35,7 +35,10 @@ export async function AppHeader() {
           {profile ? (
             <nav className="flex items-center gap-1">
               {isAdmin ? (
-                <NavLink href="/admin/queue">Queue</NavLink>
+                <>
+                  <NavLink href="/admin/queue">Queue</NavLink>
+                  <NavLink href="/admin/analytics">Analytics</NavLink>
+                </>
               ) : null}
               <NavLink href="/?tab=status">My Requests</NavLink>
               <NavLink href="/?tab=new">New Request</NavLink>
