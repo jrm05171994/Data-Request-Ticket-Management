@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { getTicketById, getTotalOpenTicketCount } from "@/lib/tickets/queries";
 import {
   REQUEST_TYPE_LABELS,
@@ -8,18 +9,34 @@ import {
   VIEW_TYPE_LABELS,
 } from "@/lib/constants";
 import { AppHeader } from "@/components/app-header";
+import { DeleteTicketButton } from "@/components/delete-ticket-button";
 
 export default async function TicketDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
   const { data: ticket, error } = await getTicketById(params.id);
   if (error || !ticket) {
     notFound();
   }
 
-  const totalOpen = await getTotalOpenTicketCount();
+  const [{ data: profile }, totalOpen] = await Promise.all([
+    supabase.from("users").select("role").eq("id", user.id).single(),
+    getTotalOpenTicketCount(),
+  ]);
+
+  const isAdmin = profile?.role === "admin";
+  const isOwnerSubmitted =
+    ticket.requester_id === user.id && ticket.stage === "submitted";
+  const canEdit = isAdmin || isOwnerSubmitted;
+  const canDelete = isAdmin || isOwnerSubmitted;
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -42,6 +59,17 @@ export default async function TicketDetailPage({
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-2">
+                {canEdit ? (
+                  <Link
+                    href={`/requests/${ticket.id}/edit`}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Edit
+                  </Link>
+                ) : null}
+                {canDelete ? <DeleteTicketButton ticketId={ticket.id} /> : null}
+              </div>
               <span
                 className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${STAGE_COLORS[ticket.stage]}`}
               >

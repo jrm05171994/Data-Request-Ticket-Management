@@ -6,12 +6,61 @@ import {
   REQUEST_TYPE_OPTIONS,
   VIEW_TYPE_OPTIONS,
 } from "@/lib/constants";
-import { createTicket, type CreateTicketResult } from "@/app/actions/tickets";
+import type {
+  RequestType,
+  ViewType,
+} from "@/lib/supabase/types";
 
-export function NewRequestForm() {
+export type RequestFormDefaults = {
+  request_name: string;
+  description: string;
+  stakeholders_internal: string;  // comma-joined
+  stakeholders_external: string;  // comma-joined
+  has_hard_deadline: boolean;
+  deadline_date: string | null;   // YYYY-MM-DD
+  request_type: RequestType | "";
+  view_type: ViewType;
+  requester_priority: number;
+  additional_info: string;
+};
+
+export type RequestFormResult =
+  | { ok: true; ticketId?: string }
+  | { ok: false; error: string };
+
+const EMPTY_DEFAULTS: RequestFormDefaults = {
+  request_name: "",
+  description: "",
+  stakeholders_internal: "",
+  stakeholders_external: "",
+  has_hard_deadline: false,
+  deadline_date: null,
+  request_type: "",
+  view_type: "aggregated",
+  requester_priority: 3,
+  additional_info: "",
+};
+
+export function RequestForm({
+  defaults = EMPTY_DEFAULTS,
+  action,
+  submitLabel = "Submit request",
+  pendingLabel = "Submitting…",
+  cancelHref,
+}: {
+  defaults?: RequestFormDefaults;
+  action: (formData: FormData) => Promise<RequestFormResult>;
+  submitLabel?: string;
+  pendingLabel?: string;
+  cancelHref?: string;
+}) {
   const [pending, startTransition] = useTransition();
-  const [externalStakeholders, setExternalStakeholders] = useState("");
-  const [hasHardDeadline, setHasHardDeadline] = useState<"yes" | "no">("no");
+  const [externalStakeholders, setExternalStakeholders] = useState(
+    defaults.stakeholders_external,
+  );
+  const [hasHardDeadline, setHasHardDeadline] = useState<"yes" | "no">(
+    defaults.has_hard_deadline ? "yes" : "no",
+  );
   const [error, setError] = useState<string | null>(null);
 
   const isExternal = externalStakeholders.trim().length > 0;
@@ -19,11 +68,11 @@ export function NewRequestForm() {
   function onSubmit(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      const result: CreateTicketResult = await createTicket(formData);
+      const result = await action(formData);
       if (!result.ok) {
         setError(result.error);
       }
-      // On success, server action redirects — no client-side navigation needed.
+      // On success, the action redirects.
     });
   }
 
@@ -36,6 +85,7 @@ export function NewRequestForm() {
           type="text"
           required
           maxLength={200}
+          defaultValue={defaults.request_name}
           className="form-input"
         />
       </Field>
@@ -46,6 +96,7 @@ export function NewRequestForm() {
           name="description"
           required
           rows={4}
+          defaultValue={defaults.description}
           className="form-input"
         />
       </Field>
@@ -61,6 +112,7 @@ export function NewRequestForm() {
             name="stakeholders_internal"
             type="text"
             placeholder="e.g. J.R., Ryan"
+            defaultValue={defaults.stakeholders_internal}
             className="form-input"
           />
         </Field>
@@ -127,6 +179,7 @@ export function NewRequestForm() {
                 name="deadline_date"
                 type="date"
                 required
+                defaultValue={defaults.deadline_date ?? undefined}
                 className="form-input"
               />
             </Field>
@@ -141,7 +194,7 @@ export function NewRequestForm() {
           id="request_type"
           name="request_type"
           required
-          defaultValue=""
+          defaultValue={defaults.request_type}
           className="form-input"
         >
           <option value="" disabled>
@@ -163,7 +216,7 @@ export function NewRequestForm() {
           </span>
         </legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          {VIEW_TYPE_OPTIONS.map((opt, i) => (
+          {VIEW_TYPE_OPTIONS.map((opt) => (
             <label
               key={opt.value}
               className="flex cursor-pointer flex-col rounded-lg border border-slate-200 p-3 text-sm has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50"
@@ -174,7 +227,7 @@ export function NewRequestForm() {
                   name="view_type"
                   value={opt.value}
                   required
-                  defaultChecked={i === 0}
+                  defaultChecked={defaults.view_type === opt.value}
                 />
                 <span className="font-medium text-slate-900">{opt.label}</span>
               </span>
@@ -194,7 +247,7 @@ export function NewRequestForm() {
           id="requester_priority"
           name="requester_priority"
           required
-          defaultValue="3"
+          defaultValue={String(defaults.requester_priority)}
           className="form-input"
         >
           {PRIORITY_OPTIONS.map((opt) => (
@@ -210,20 +263,34 @@ export function NewRequestForm() {
         htmlFor="additional_info"
         helper="Anything else the data team should know."
       >
-        <textarea id="additional_info" name="additional_info" rows={3} className="form-input" />
+        <textarea
+          id="additional_info"
+          name="additional_info"
+          rows={3}
+          defaultValue={defaults.additional_info}
+          className="form-input"
+        />
       </Field>
 
       {error ? (
         <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
       ) : null}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        {cancelHref ? (
+          <a
+            href={cancelHref}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            Cancel
+          </a>
+        ) : null}
         <button
           type="submit"
           disabled={pending}
           className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60"
         >
-          {pending ? "Submitting…" : "Submit request"}
+          {pending ? pendingLabel : submitLabel}
         </button>
       </div>
     </form>

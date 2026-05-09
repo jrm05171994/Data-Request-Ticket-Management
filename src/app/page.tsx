@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/app-header";
-import { NewRequestForm } from "@/components/new-request-form";
+import { RequestForm } from "@/components/request-form";
+import { createTicket } from "@/app/actions/tickets";
 import { RequestStatusList } from "@/components/request-status-list";
 import { listMyTickets, getTotalOpenTicketCount } from "@/lib/tickets/queries";
 
@@ -36,7 +37,7 @@ export default async function Home({
                 Tell the data team what you need. The more context, the faster the turnaround.
               </p>
               <div className="mt-6">
-                <NewRequestForm />
+                <RequestForm action={createTicket} />
               </div>
             </div>
           ) : (
