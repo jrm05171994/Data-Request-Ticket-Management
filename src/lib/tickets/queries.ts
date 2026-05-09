@@ -60,11 +60,27 @@ export async function getTotalOpenTicketCount(): Promise<number> {
 }
 
 /**
- * Tickets visible to the current user (RLS-filtered).
- * For requesters: their own tickets.
- * For admins: every ticket.
+ * Tickets the user submitted themselves (Request Status tab).
+ * Even admins should see only their own here — the cross-org view
+ * belongs in /admin/queue, not on the personal status tab.
  */
-export async function listMyTickets() {
+export async function listMyTickets(userId: string) {
+  const supabase = createClient();
+  return supabase
+    .from("tickets")
+    .select(LIST_SELECT)
+    .eq("requester_id", userId)
+    .order("priority_rank", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .returns<TicketListed[]>();
+}
+
+/**
+ * Admin queue: every ticket, ranked. Same shape as listMyTickets but
+ * relies on the caller already being an admin (RLS still enforces it).
+ * Open tickets first by rank, then completed tickets by completion date.
+ */
+export async function listAllTicketsForAdmin() {
   const supabase = createClient();
   return supabase
     .from("tickets")

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { AppHeader } from "@/components/app-header";
 import { RequestForm } from "@/components/request-form";
 import { createTicket } from "@/app/actions/tickets";
@@ -14,11 +14,14 @@ export default async function Home({
 }: {
   searchParams: SearchParams;
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = await requireUser();
+
+  // Admins land on the queue by default. They can still come here
+  // explicitly via ?tab=new (submit) or ?tab=status (their own requests).
+  const explicitTab = searchParams.tab === "new" || searchParams.tab === "status";
+  if (user.role === "admin" && !explicitTab) {
+    redirect("/admin/queue");
+  }
 
   const tab = searchParams.tab === "new" ? "new" : "status";
 
@@ -41,7 +44,7 @@ export default async function Home({
               </div>
             </div>
           ) : (
-            <StatusTab highlightId={searchParams.created} />
+            <StatusTab userId={user.id} highlightId={searchParams.created} />
           )}
         </div>
       </div>
@@ -49,9 +52,15 @@ export default async function Home({
   );
 }
 
-async function StatusTab({ highlightId }: { highlightId?: string }) {
+async function StatusTab({
+  userId,
+  highlightId,
+}: {
+  userId: string;
+  highlightId?: string;
+}) {
   const [{ data: tickets, error }, totalOpen] = await Promise.all([
-    listMyTickets(),
+    listMyTickets(userId),
     getTotalOpenTicketCount(),
   ]);
 
@@ -76,7 +85,7 @@ function Tabs({ current }: { current: "new" | "status" }) {
   return (
     <nav className="flex gap-2 border-b border-slate-200">
       <TabLink href="/?tab=status" active={current === "status"}>
-        Request Status
+        My Requests
       </TabLink>
       <TabLink href="/?tab=new" active={current === "new"}>
         New Request
