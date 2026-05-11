@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { listAllTicketsForAdmin } from "@/lib/tickets/queries";
+import {
+  listAllTicketsForAdmin,
+  listArchivedTicketsForAdmin,
+} from "@/lib/tickets/queries";
 import { listAssignableUsers } from "@/lib/users/queries";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "@/components/app-header";
 import { EtaCell, OwnerCell, StageCell } from "@/components/admin/inline-cells";
 import { QueueActiveFilters } from "@/components/admin/queue-active-filters";
+import { ArchivedTable } from "@/components/admin/archived-table";
 import type { RequestType, Stage } from "@/lib/supabase/types";
 import { REQUEST_TYPE_LABELS } from "@/lib/constants";
 
@@ -61,23 +65,28 @@ export default async function AdminQueuePage({
   const filters = parseFilters(searchParams);
 
   const supabase = createClient();
-  const [{ data: tickets, error: ticketsError }, { data: users, error: usersError }, requesterRow] =
-    await Promise.all([
-      listAllTicketsForAdmin({
-        stages: filters.stages.length ? filters.stages : null,
-        types: filters.types.length ? filters.types : null,
-        requesterId: filters.requesterId,
-        late: filters.late,
-      }),
-      listAssignableUsers(),
-      filters.requesterId
-        ? supabase
-            .from("users")
-            .select("id, email, full_name")
-            .eq("id", filters.requesterId)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]);
+  const [
+    { data: tickets, error: ticketsError },
+    { data: users, error: usersError },
+    requesterRow,
+    { data: archived, error: archivedError },
+  ] = await Promise.all([
+    listAllTicketsForAdmin({
+      stages: filters.stages.length ? filters.stages : null,
+      types: filters.types.length ? filters.types : null,
+      requesterId: filters.requesterId,
+      late: filters.late,
+    }),
+    listAssignableUsers(),
+    filters.requesterId
+      ? supabase
+          .from("users")
+          .select("id, email, full_name")
+          .eq("id", filters.requesterId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    listArchivedTicketsForAdmin(),
+  ]);
 
   if (ticketsError) {
     return (
@@ -220,6 +229,47 @@ export default async function AdminQueuePage({
             </div>
           </div>
         )}
+
+        {/* Archived collapsible -------------------------------------- */}
+        <details className="group mt-6 overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-slate-200">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 transition hover:bg-slate-50">
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Archived
+              </h2>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                {(archived ?? []).length}
+              </span>
+              <span className="text-xs text-slate-400">
+                Click to expand · admins can restore
+              </span>
+            </div>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+              />
+            </svg>
+          </summary>
+          <div className="border-t border-slate-200">
+            {archivedError ? (
+              <p className="px-6 py-4 text-sm text-koda-coral-700">
+                Could not load archived: {archivedError.message}
+              </p>
+            ) : (
+              <ArchivedTable tickets={archived ?? []} />
+            )}
+          </div>
+        </details>
       </div>
     </main>
   );
