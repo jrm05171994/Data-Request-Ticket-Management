@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
   const command = params.get("command");
   const triggerId = params.get("trigger_id");
 
-  if (command !== "/submit-request") {
+  // Accept either spec name or the more natural "/submit-data-request".
+  const KNOWN_COMMANDS = new Set(["/submit-request", "/submit-data-request"]);
+  if (!command || !KNOWN_COMMANDS.has(command)) {
     return NextResponse.json({
       response_type: "ephemeral",
       text: `Unknown command: ${command}`,
