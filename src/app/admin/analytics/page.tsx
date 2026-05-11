@@ -237,32 +237,37 @@ export default async function AdminAnalyticsPage({
         {/* Avg time per stage + top requesters -------------------------- */}
         <section className="mt-4 grid gap-4 lg:grid-cols-2">
           <Card title="Average Time at Each Stage">
-            {stageOrder.map((s) => {
-              const entry = avgStageMap.get(s);
-              return (
-                <div
-                  key={s}
-                  className="flex items-center justify-between border-b border-slate-100 py-2 last:border-0"
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STAGE_COLORS[s]}`}
-                    >
-                      {STAGE_LABELS[s]}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      {entry?.samples ?? 0} sample
-                      {entry?.samples === 1 ? "" : "s"}
+            {stageOrder
+              .filter((s) => s !== "completed")
+              .map((s) => {
+                const entry = avgStageMap.get(s);
+                return (
+                  <div
+                    key={s}
+                    className="flex items-center justify-between border-b border-slate-100 py-2 last:border-0"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STAGE_COLORS[s]}`}
+                      >
+                        {STAGE_LABELS[s]}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {entry?.samples ?? 0} sample
+                        {entry?.samples === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium tabular-nums text-slate-800">
+                      {formatDuration(entry?.avg ?? null)}
                     </span>
                   </div>
-                  <span className="text-sm font-medium tabular-nums text-slate-800">
-                    {formatDuration(entry?.avg ?? null)}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
             <p className="mt-3 text-xs text-slate-400">
               Includes time tickets are still spending in their current stage.
+              Completed is omitted — use{" "}
+              <span className="font-medium text-slate-500">Avg time to complete</span>{" "}
+              above for the full submission-to-completion duration.
             </p>
           </Card>
 
