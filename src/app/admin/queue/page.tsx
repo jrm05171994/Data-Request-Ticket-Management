@@ -10,8 +10,9 @@ import { AppHeader } from "@/components/app-header";
 import { EtaCell, OwnerCell, StageCell } from "@/components/admin/inline-cells";
 import { QueueActiveFilters } from "@/components/admin/queue-active-filters";
 import { ArchivedTable } from "@/components/admin/archived-table";
+import { pillColorForUser } from "@/lib/users/colors";
 import type { RequestType, Stage } from "@/lib/supabase/types";
-import { REQUEST_TYPE_LABELS } from "@/lib/constants";
+import { REQUEST_TYPE_LABELS, REQUEST_TYPE_PILL_CLASSES } from "@/lib/constants";
 
 type SearchParams = {
   stages?: string;
@@ -192,14 +193,22 @@ export default async function AdminQueuePage({
                         </div>
                       </Td>
                       <Td>
-                        <span className="text-xs text-slate-700">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${REQUEST_TYPE_PILL_CLASSES[t.request_type]}`}
+                        >
                           {REQUEST_TYPE_LABELS[t.request_type]}
                         </span>
                       </Td>
                       <Td>
-                        <div className="text-sm text-slate-700">
-                          {t.requester?.full_name ?? t.requester?.email ?? "—"}
-                        </div>
+                        {t.requester ? (
+                          <span
+                            className={`inline-flex max-w-[14rem] truncate rounded-full px-2 py-0.5 text-xs font-medium ${pillColorForUser(t.requester.id)}`}
+                          >
+                            {t.requester.full_name ?? t.requester.email}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-slate-400">—</span>
+                        )}
                       </Td>
                       <Td>
                         <span className="text-sm text-slate-600">

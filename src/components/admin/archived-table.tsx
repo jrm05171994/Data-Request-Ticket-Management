@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { REQUEST_TYPE_LABELS, STAGE_COLORS, STAGE_LABELS } from "@/lib/constants";
+import {
+  REQUEST_TYPE_LABELS,
+  REQUEST_TYPE_PILL_CLASSES,
+  STAGE_COLORS,
+  STAGE_LABELS,
+} from "@/lib/constants";
+import { pillColorForUser } from "@/lib/users/colors";
 import { RestoreTicketButton } from "@/components/admin/restore-ticket-button";
 import type { TicketListed } from "@/lib/tickets/queries";
 
@@ -38,12 +44,20 @@ export function ArchivedTable({ tickets }: { tickets: TicketListed[] }) {
                 </Link>
               </Td>
               <Td>
-                <span className="text-sm text-slate-700">
-                  {t.requester?.full_name ?? t.requester?.email ?? "—"}
-                </span>
+                {t.requester ? (
+                  <span
+                    className={`inline-flex max-w-[12rem] truncate rounded-full px-2 py-0.5 text-xs font-medium ${pillColorForUser(t.requester.id)}`}
+                  >
+                    {t.requester.full_name ?? t.requester.email}
+                  </span>
+                ) : (
+                  <span className="text-sm text-slate-400">—</span>
+                )}
               </Td>
               <Td>
-                <span className="text-xs text-slate-700">
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${REQUEST_TYPE_PILL_CLASSES[t.request_type]}`}
+                >
                   {REQUEST_TYPE_LABELS[t.request_type]}
                 </span>
               </Td>
