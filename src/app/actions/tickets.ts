@@ -168,7 +168,10 @@ export async function updateTicket(
   redirect(`/requests/${ticketId}`);
 }
 
-// DELETE -------------------------------------------------------------------
+// ARCHIVE (soft delete) ---------------------------------------------------
+// Renamed conceptually to "archive" but kept as deleteTicket() to avoid
+// touching every caller. Records who archived and when so admins can audit
+// and restore from /admin/archived.
 
 export async function deleteTicket(ticketId: string): Promise<TicketActionResult> {
   const supabase = createClient();
@@ -179,21 +182,68 @@ export async function deleteTicket(ticketId: string): Promise<TicketActionResult
 
   const { data, error } = await supabase
     .from("tickets")
-    .delete()
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: user.id,
+    })
     .eq("id", ticketId)
-    .select("id");
+    .is("deleted_at", null)  // don't double-archive
+    .select("id")
+    .maybeSingle();
 
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-  if (!data || data.length === 0) {
+  if (error) return { ok: false, error: error.message };
+  if (!data) {
     return {
       ok: false,
       error:
-        "Cannot delete this request — it may have moved out of the Submitted stage, or you don't have permission.",
+        "Cannot archive this request — it may already be archived, or it has moved out of the Submitted stage and you don't have admin rights.",
     };
   }
 
   revalidatePath("/");
+  revalidatePath("/admin/queue");
+  revalidatePath("/admin/archived");
   redirect("/?tab=status");
+}
+
+// RESTORE -----------------------------------------------------------------
+
+export async function restoreTicket(ticketId: string): Promise<TicketActionResult> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  // Confirm caller is admin (restore is admin-only).
+  const { data: profile } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (profile?.role !== "admin") {
+    return { ok: false, error: "Only admins can restore archived requests." };
+  }
+
+  const { data, error } = await supabase
+    .from("tickets")
+    .update({ deleted_at: null, deleted_by: null })
+    .eq("id", ticketId)
+    .not("deleted_at", "is", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!data) {
+    return {
+      ok: false,
+      error: "Cannot restore — request was not archived (or no longer exists).",
+    };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin/queue");
+  revalidatePath("/admin/archived");
+  revalidatePath(`/requests/${ticketId}`);
+  return { ok: true };
 }

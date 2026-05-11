@@ -10,6 +10,7 @@ import {
 } from "@/lib/constants";
 import { AppHeader } from "@/components/app-header";
 import { DeleteTicketButton } from "@/components/delete-ticket-button";
+import { RestoreTicketButton } from "@/components/admin/restore-ticket-button";
 
 export default async function TicketDetailPage({
   params,
@@ -33,10 +34,12 @@ export default async function TicketDetailPage({
   ]);
 
   const isAdmin = profile?.role === "admin";
+  const isArchived = ticket.deleted_at != null;
   const isOwnerSubmitted =
     ticket.requester_id === user.id && ticket.stage === "submitted";
-  const canEdit = isAdmin || isOwnerSubmitted;
-  const canDelete = isAdmin || isOwnerSubmitted;
+  const canEdit = !isArchived && (isAdmin || isOwnerSubmitted);
+  const canArchive = !isArchived && (isAdmin || isOwnerSubmitted);
+  const canRestore = isArchived && isAdmin;
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -46,6 +49,22 @@ export default async function TicketDetailPage({
         <Link href="/" className="text-sm text-indigo-600 hover:underline">
           ← Back to my requests
         </Link>
+
+        {isArchived ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-200">
+            <p className="text-sm text-amber-900">
+              <span className="font-semibold">Archived</span>
+              {ticket.deleted_at
+                ? ` on ${formatDateTime(ticket.deleted_at)}`
+                : ""}
+              {ticket.deleter
+                ? ` by ${ticket.deleter.full_name ?? ticket.deleter.email}`
+                : ""}
+              . Not counted in the active queue, ranks, or analytics.
+            </p>
+            {canRestore ? <RestoreTicketButton ticketId={ticket.id} variant="primary" /> : null}
+          </div>
+        ) : null}
 
         <div className="mt-4 rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6">
@@ -68,7 +87,7 @@ export default async function TicketDetailPage({
                     Edit
                   </Link>
                 ) : null}
-                {canDelete ? <DeleteTicketButton ticketId={ticket.id} /> : null}
+                {canArchive ? <DeleteTicketButton ticketId={ticket.id} label="Archive" /> : null}
               </div>
               <span
                 className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${STAGE_COLORS[ticket.stage]}`}

@@ -38,6 +38,7 @@ export async function AppHeader() {
                 <>
                   <NavLink href="/admin/queue">Queue</NavLink>
                   <NavLink href="/admin/analytics">Analytics</NavLink>
+                  <NavLink href="/admin/archived">Archived</NavLink>
                   <NavLink href="/admin/users">Users</NavLink>
                   <NavLink href="/admin/scoring">Scoring</NavLink>
                 </>

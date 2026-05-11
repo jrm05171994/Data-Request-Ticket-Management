@@ -1,3 +1,4 @@
+import type { PostgrestError } from "@supabase/supabase-js";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import type { Database, RequestType, Stage } from "@/lib/supabase/types";
 
@@ -16,14 +17,18 @@ export type TicketListed = Pick<
   | "owner_id"
   | "requester_id"
   | "request_type"
+  | "deleted_at"
+  | "deleted_by"
 > & {
   owner: UserMini | null;
   requester: UserMini | null;
+  deleter: UserMini | null;
 };
 
 export type TicketDetail = TicketRow & {
   owner: UserMini | null;
   requester: UserMini | null;
+  deleter: UserMini | null;
 };
 
 export type AdminQueueFilters = {
@@ -36,29 +41,30 @@ export type AdminQueueFilters = {
 const LIST_SELECT = `
   id, request_name, stage, priority_rank, priority_score,
   expected_completion_date, created_at, owner_id, requester_id, request_type,
+  deleted_at, deleted_by,
   owner:owner_id ( id, email, full_name ),
-  requester:requester_id ( id, email, full_name )
+  requester:requester_id ( id, email, full_name ),
+  deleter:deleted_by ( id, email, full_name )
 `;
 
 const DETAIL_SELECT = `
   *,
   owner:owner_id ( id, email, full_name ),
-  requester:requester_id ( id, email, full_name )
+  requester:requester_id ( id, email, full_name ),
+  deleter:deleted_by ( id, email, full_name )
 `;
 
 /**
- * Count of all non-completed tickets across the system.
+ * Count of all non-completed, non-deleted tickets across the system.
  * Used for the "Rank X of Y" display on requester views.
- *
- * Service role bypasses RLS — requesters can't see other people's tickets,
- * but they can know how big the open queue is.
  */
 export async function getTotalOpenTicketCount(): Promise<number> {
   const supabase = createServiceRoleClient();
   const { count, error } = await supabase
     .from("tickets")
     .select("id", { count: "exact", head: true })
-    .neq("stage", "completed");
+    .neq("stage", "completed")
+    .is("deleted_at", null);
 
   if (error) {
     console.error("getTotalOpenTicketCount", error);
@@ -69,8 +75,7 @@ export async function getTotalOpenTicketCount(): Promise<number> {
 
 /**
  * Tickets the user submitted themselves (Request Status tab).
- * Even admins should see only their own here — the cross-org view
- * belongs in /admin/queue, not on the personal status tab.
+ * Excludes archived; admins can see archived via /admin/archived.
  */
 export async function listMyTickets(userId: string) {
   const supabase = createClient();
@@ -78,18 +83,21 @@ export async function listMyTickets(userId: string) {
     .from("tickets")
     .select(LIST_SELECT)
     .eq("requester_id", userId)
+    .is("deleted_at", null)
     .order("priority_rank", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false })
     .returns<TicketListed[]>();
 }
 
 /**
- * Admin queue: every ticket with optional filters. RLS still enforces admin.
- * Open tickets first by rank, then completed tickets by created_at.
+ * Admin queue: active tickets only. Filters compose.
  */
 export async function listAllTicketsForAdmin(filters?: Partial<AdminQueueFilters>) {
   const supabase = createClient();
-  let query = supabase.from("tickets").select(LIST_SELECT);
+  let query = supabase
+    .from("tickets")
+    .select(LIST_SELECT)
+    .is("deleted_at", null);
 
   if (filters?.stages && filters.stages.length > 0) {
     query = query.in("stage", filters.stages);
@@ -101,7 +109,6 @@ export async function listAllTicketsForAdmin(filters?: Partial<AdminQueueFilters
     query = query.eq("requester_id", filters.requesterId);
   }
   if (filters?.late) {
-    // open + has ETA + ETA in the past
     query = query
       .neq("stage", "completed")
       .not("expected_completion_date", "is", null)
@@ -112,6 +119,29 @@ export async function listAllTicketsForAdmin(filters?: Partial<AdminQueueFilters
     .order("priority_rank", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false })
     .returns<TicketListed[]>();
+}
+
+/**
+ * Archived tickets for admin /admin/archived page.
+ * Most-recently-archived first.
+ *
+ * Typed explicitly because `.not("col", "is", null)` confuses the
+ * Supabase TS inference enough to collapse to `never`.
+ */
+export async function listArchivedTicketsForAdmin(): Promise<{
+  data: TicketListed[] | null;
+  error: PostgrestError | null;
+}> {
+  const supabase = createClient();
+  const result = await supabase
+    .from("tickets")
+    .select(LIST_SELECT)
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false });
+  return {
+    data: (result.data as TicketListed[] | null) ?? null,
+    error: result.error,
+  };
 }
 
 export async function getTicketById(id: string) {

@@ -42,6 +42,8 @@ type TicketsRow = {
   completed_at: string | null;
   stakeholders_internal: string[] | null;
   stakeholders_external: string[] | null;
+  deleted_at: string | null;
+  deleted_by: string | null;
 };
 
 type PriorityConfigRow = {
