@@ -57,6 +57,8 @@ function parseFilters(searchParams: SearchParams) {
   return { stages, types, requesterId, late };
 }
 
+const ACTIVE_STAGES: Stage[] = ["submitted", "received", "in_progress"];
+
 export default async function AdminQueuePage({
   searchParams,
 }: {
@@ -65,19 +67,37 @@ export default async function AdminQueuePage({
   await requireAdmin();
   const filters = parseFilters(searchParams);
 
+  // The main table defaults to active stages only. Completed lives in a
+  // collapsible at the bottom of the page so it doesn't clutter the queue.
+  // When an admin explicitly filters by stage (e.g. from the "Completed"
+  // analytics KPI), we respect their filter and hide the collapsible to
+  // avoid showing the same tickets twice.
+  const stageFilterExplicit = filters.stages.length > 0;
+  const mainTableStages = stageFilterExplicit ? filters.stages : ACTIVE_STAGES;
+  const showCompletedSection = !stageFilterExplicit;
+
   const supabase = createClient();
   const [
     { data: tickets, error: ticketsError },
+    { data: completed, error: completedError },
     { data: users, error: usersError },
     requesterRow,
     { data: archived, error: archivedError },
   ] = await Promise.all([
     listAllTicketsForAdmin({
-      stages: filters.stages.length ? filters.stages : null,
+      stages: mainTableStages,
       types: filters.types.length ? filters.types : null,
       requesterId: filters.requesterId,
       late: filters.late,
     }),
+    showCompletedSection
+      ? listAllTicketsForAdmin({
+          stages: ["completed"],
+          types: filters.types.length ? filters.types : null,
+          requesterId: filters.requesterId,
+          late: false,
+        })
+      : Promise.resolve({ data: null, error: null }),
     listAssignableUsers(),
     filters.requesterId
       ? supabase
@@ -103,7 +123,8 @@ export default async function AdminQueuePage({
   }
 
   const allTickets = tickets ?? [];
-  const openCount = allTickets.filter((t) => t.stage !== "completed").length;
+  const completedTickets = completed ?? [];
+  const archivedTickets = archived ?? [];
   const requesterRecord =
     requesterRow && "data" in requesterRow ? requesterRow.data : null;
 
@@ -111,7 +132,13 @@ export default async function AdminQueuePage({
     ? requesterRecord.full_name ?? requesterRecord.email
     : null;
 
-  const totalLine = describeFilters(filters, allTickets.length, openCount);
+  const totalLine = describeFilters(
+    filters,
+    allTickets.length,
+    completedTickets.length,
+    archivedTickets.length,
+    showCompletedSection,
+  );
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -239,6 +266,112 @@ export default async function AdminQueuePage({
           </div>
         )}
 
+        {/* Completed collapsible ------------------------------------- */}
+        {showCompletedSection ? (
+          <details className="group mt-6 overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-slate-200">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 transition hover:bg-slate-50">
+              <div className="flex items-center gap-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Completed
+                </h2>
+                <span className="rounded-full bg-koda-green-100 px-2 py-0.5 text-xs font-medium text-koda-green-700">
+                  {completedTickets.length}
+                </span>
+                <span className="text-xs text-slate-400">
+                  Click to expand · finished requests, kept for reference
+                </span>
+              </div>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                />
+              </svg>
+            </summary>
+            <div className="border-t border-slate-200">
+              {completedError ? (
+                <p className="px-6 py-4 text-sm text-koda-coral-700">
+                  Could not load completed: {completedError.message}
+                </p>
+              ) : completedTickets.length === 0 ? (
+                <p className="px-6 py-8 text-center text-sm text-slate-500">
+                  No completed requests yet.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <Th>Request Name</Th>
+                        <Th className="w-44">Type</Th>
+                        <Th className="w-40">Requester</Th>
+                        <Th className="w-56">Task Owner</Th>
+                        <Th className="w-44">Completed</Th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {completedTickets.map((t) => (
+                        <tr key={t.id} className="align-middle">
+                          <Td>
+                            <Link
+                              href={`/requests/${t.id}`}
+                              className="block font-medium text-slate-900 hover:text-koda-navy"
+                            >
+                              {t.request_name}
+                            </Link>
+                            <div className="text-xs text-slate-500">
+                              score {Number(t.priority_score).toFixed(2)}
+                            </div>
+                          </Td>
+                          <Td>
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${REQUEST_TYPE_PILL_CLASSES[t.request_type]}`}
+                            >
+                              {REQUEST_TYPE_LABELS[t.request_type]}
+                            </span>
+                          </Td>
+                          <Td>
+                            {t.requester ? (
+                              <span
+                                className={`inline-flex max-w-[12rem] truncate rounded-full px-2 py-0.5 text-xs font-medium ${pillColorForUser(t.requester.id)}`}
+                              >
+                                {t.requester.full_name ?? t.requester.email}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-slate-400">—</span>
+                            )}
+                          </Td>
+                          <Td>
+                            <span className="text-sm text-slate-700">
+                              {t.owner?.full_name ?? t.owner?.email ?? (
+                                <span className="text-slate-400">Unassigned</span>
+                              )}
+                            </span>
+                          </Td>
+                          <Td>
+                            <span className="text-sm text-slate-600">
+                              {formatDate(t.created_at)}
+                            </span>
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </details>
+        ) : null}
+
         {/* Archived collapsible -------------------------------------- */}
         <details className="group mt-6 overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-slate-200">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 transition hover:bg-slate-50">
@@ -246,8 +379,8 @@ export default async function AdminQueuePage({
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
                 Archived
               </h2>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                {(archived ?? []).length}
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                {archivedTickets.length}
               </span>
               <span className="text-xs text-slate-400">
                 Click to expand · admins can restore
@@ -275,7 +408,7 @@ export default async function AdminQueuePage({
                 Could not load archived: {archivedError.message}
               </p>
             ) : (
-              <ArchivedTable tickets={archived ?? []} />
+              <ArchivedTable tickets={archivedTickets} />
             )}
           </div>
         </details>
@@ -287,14 +420,21 @@ export default async function AdminQueuePage({
 function describeFilters(
   filters: ReturnType<typeof parseFilters>,
   shown: number,
-  openCount: number,
+  completedCount: number,
+  archivedCount: number,
+  showCompletedSection: boolean,
 ): string {
   const hasFilter =
     filters.stages.length || filters.types.length || filters.requesterId || filters.late;
   if (hasFilter) {
     return `${shown} ticket${shown === 1 ? "" : "s"} match — clear filters to see the full queue.`;
   }
-  return `${openCount} open · ${shown} total · ranked by priority score.`;
+  const parts = [
+    `${shown} active`,
+    showCompletedSection ? `${completedCount} completed` : null,
+    `${archivedCount} archived`,
+  ].filter(Boolean);
+  return `${parts.join(" · ")} · ranked by priority score.`;
 }
 
 function Th({ children, className }: { children: React.ReactNode; className?: string }) {
