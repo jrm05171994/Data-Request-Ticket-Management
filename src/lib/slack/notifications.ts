@@ -70,12 +70,14 @@ export async function notifyStageChange({
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
   const ticketUrl = appUrl ? `${appUrl}/requests/${ticketId}` : null;
 
+  const etaLine = ticket.expected_completion_date
+    ? `Expected Completion Date is *${formatDate(ticket.expected_completion_date)}*.`
+    : "Expected Completion Date is not set yet.";
+
   const lines: string[] = [
     `Update on *${escapeText(ticket.request_name)}*: status is now *${STAGE_LABELS[toStage]}*.`,
+    etaLine,
   ];
-  if (ticket.expected_completion_date) {
-    lines.push(`Expected completion: ${ticket.expected_completion_date}`);
-  }
   if (ticketUrl) {
     lines.push(ticketUrl);
   }
@@ -108,6 +110,19 @@ function escapeText(s: string): string {
   return s.replace(/[<>&]/g, (c) =>
     c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;",
   );
+}
+
+function formatDate(iso: string): string {
+  // Tickets store deadline_date / expected_completion_date as a Postgres DATE
+  // (YYYY-MM-DD). Parse as UTC to avoid timezone drift, then format like
+  // "May 25, 2026" to match the web app.
+  const d = new Date(`${iso}T00:00:00Z`);
+  return d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 function errMessage(err: unknown): string {
