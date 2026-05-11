@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { notifyNewRequest } from "@/lib/slack/notifications";
 import type {
   RequestType,
   StakeholderType,
@@ -123,6 +124,15 @@ export async function createTicket(formData: FormData): Promise<TicketActionResu
 
   if (error || !data) {
     return { ok: false, error: error?.message ?? "Could not create request." };
+  }
+
+  // DM new-request notification recipients (Ryan by default). Awaited so
+  // the serverless function doesn't exit early, try/catch so Slack issues
+  // can't block the user's redirect.
+  try {
+    await notifyNewRequest({ ticketId: data.id });
+  } catch (err) {
+    console.error("notifyNewRequest threw", err);
   }
 
   revalidatePath("/");

@@ -10,6 +10,7 @@ import {
 } from "@/lib/slack/extract";
 import { resolveSlackUserToAppUser } from "@/lib/slack/user-mapping";
 import { SUBMIT_REQUEST_CALLBACK_ID } from "@/lib/slack/modal";
+import { notifyNewRequest } from "@/lib/slack/notifications";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { STAGE_LABELS } from "@/lib/constants";
 import type {
@@ -186,6 +187,13 @@ export async function POST(request: NextRequest) {
   } catch (dmErr) {
     console.error("DM confirmation failed", dmErr);
     // Don't block the modal close — the ticket is created either way.
+  }
+
+  // DM new-request notification recipients (Ryan by default).
+  try {
+    await notifyNewRequest({ ticketId: ticket.id });
+  } catch (err) {
+    console.error("notifyNewRequest (slack modal) threw", err);
   }
 
   // Empty 200 closes the modal.

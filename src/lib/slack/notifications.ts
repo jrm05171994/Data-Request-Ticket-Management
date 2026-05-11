@@ -1,7 +1,18 @@
 import { slack } from "./client";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { STAGE_LABELS } from "@/lib/constants";
-import type { Stage } from "@/lib/supabase/types";
+import { REQUEST_TYPE_LABELS, STAGE_LABELS } from "@/lib/constants";
+import type { RequestType, Stage } from "@/lib/supabase/types";
+
+const DEFAULT_NEW_REQUEST_RECIPIENTS = ["ryan@kodahealthcare.com"];
+
+function getNewRequestRecipients(): string[] {
+  const raw = process.env.NEW_REQUEST_NOTIFY_EMAILS;
+  if (raw === undefined) return DEFAULT_NEW_REQUEST_RECIPIENTS;
+  return raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
 
 export type NotifyResult =
   | { ok: true; skipped?: string }
@@ -123,6 +134,115 @@ function formatDate(iso: string): string {
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+// ---------- New request notifications -------------------------------------
+
+type NewRequestTicket = {
+  request_name: string;
+  request_type: RequestType;
+  requester_priority: number;
+  stakeholder_type: "internal" | "external";
+  has_hard_deadline: boolean;
+  deadline_date: string | null;
+  requester: { email: string; full_name: string | null } | null;
+};
+
+/**
+ * DM the configured recipients (default: ryan@kodahealthcare.com) whenever a
+ * new ticket is created, regardless of where it came from — web form, Slack
+ * slash command, or #alerts-client-data auto-ticket. Skips DMing the
+ * submitter themselves and silently skips recipients without a Slack account
+ * in the workspace.
+ *
+ * Configure via NEW_REQUEST_NOTIFY_EMAILS=email1,email2 (comma-separated).
+ * Set to an empty string to disable.
+ */
+export async function notifyNewRequest({
+  ticketId,
+}: {
+  ticketId: string;
+}): Promise<NotifyResult> {
+  const recipients = getNewRequestRecipients();
+  if (recipients.length === 0) {
+    return { ok: true, skipped: "no recipients configured" };
+  }
+
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("tickets")
+    .select(
+      `request_name, request_type, requester_priority,
+       stakeholder_type, has_hard_deadline, deadline_date,
+       requester:requester_id ( email, full_name )`,
+    )
+    .eq("id", ticketId)
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+  const ticket = data as unknown as NewRequestTicket | null;
+  if (!ticket) return { ok: false, error: "ticket not found" };
+
+  const submitterEmail = ticket.requester?.email?.toLowerCase() ?? null;
+  const submitterName =
+    ticket.requester?.full_name ?? ticket.requester?.email ?? "someone";
+
+  // Build message body — same for every recipient
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
+  const ticketUrl = appUrl ? `${appUrl}/requests/${ticketId}` : null;
+
+  const deadlineSuffix =
+    ticket.stakeholder_type === "external" &&
+    ticket.has_hard_deadline &&
+    ticket.deadline_date
+      ? ` · hard deadline ${formatDate(ticket.deadline_date)}`
+      : "";
+
+  const lines: string[] = [
+    `*New request:* "${escapeText(ticket.request_name)}"`,
+    `Submitted by *${escapeText(submitterName)}*.`,
+    `Type: ${REQUEST_TYPE_LABELS[ticket.request_type]} · Priority ${ticket.requester_priority}/5 · ${ticket.stakeholder_type}${deadlineSuffix}`,
+  ];
+  if (ticketUrl) lines.push(ticketUrl);
+  const text = lines.join("\n");
+
+  let anySent = false;
+
+  for (const email of recipients) {
+    // Don't DM the submitter themselves
+    if (submitterEmail && email === submitterEmail) continue;
+
+    let slackUserId: string | null = null;
+    try {
+      const lookup = await slack().users.lookupByEmail({ email });
+      slackUserId = lookup.user?.id ?? null;
+    } catch (err) {
+      console.warn("new-request lookupByEmail miss", email, errMessage(err));
+      continue;
+    }
+    if (!slackUserId) continue;
+
+    try {
+      await slack().chat.postMessage({ channel: slackUserId, text });
+      anySent = true;
+    } catch (err) {
+      console.error("new-request DM failed", email, errMessage(err));
+      continue;
+    }
+
+    try {
+      await supabase.from("slack_notifications").insert({
+        ticket_id: ticketId,
+        slack_user_id: slackUserId,
+        notification_type: "new_request",
+        payload: { recipient_email: email, text },
+      });
+    } catch (logErr) {
+      console.error("new-request audit log failed", errMessage(logErr));
+    }
+  }
+
+  return anySent ? { ok: true } : { ok: true, skipped: "no recipients reached" };
 }
 
 function errMessage(err: unknown): string {

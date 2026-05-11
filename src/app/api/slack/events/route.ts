@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifySlackSignature } from "@/lib/slack/verify";
 import { slack } from "@/lib/slack/client";
 import { resolveSlackUserToAppUser } from "@/lib/slack/user-mapping";
+import { notifyNewRequest } from "@/lib/slack/notifications";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { STAGE_LABELS } from "@/lib/constants";
 
@@ -198,6 +199,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("confirmation thread reply failed", err);
+  }
+
+  // DM new-request notification recipients (Ryan by default).
+  try {
+    await notifyNewRequest({ ticketId: ticket.id });
+  } catch (err) {
+    console.error("notifyNewRequest (auto-ticket) threw", err);
   }
 
   return new NextResponse("", { status: 200 });
