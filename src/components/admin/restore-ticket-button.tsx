@@ -37,15 +37,15 @@ export function RestoreTicketButton({
 
   const cls =
     variant === "primary"
-      ? "rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60"
-      : "rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:opacity-60";
+      ? "rounded-lg bg-koda-green px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-koda-green-700 disabled:opacity-60"
+      : "rounded-lg border border-koda-green-100 bg-white px-3 py-1.5 text-sm font-medium text-koda-green-700 shadow-sm transition hover:bg-koda-green-50 disabled:opacity-60";
 
   return (
     <div className="flex flex-col items-end gap-1">
       <button type="button" onClick={onClick} disabled={pending} className={cls}>
         {pending ? "Restoring…" : label}
       </button>
-      {error ? <p className="text-xs text-red-700">{error}</p> : null}
+      {error ? <p className="text-xs text-koda-coral-700">{error}</p> : null}
     </div>
   );
 }

@@ -47,7 +47,7 @@ export const STAGE_LABELS: Record<Stage, string> = {
 
 export const STAGE_COLORS: Record<Stage, string> = {
   submitted: "bg-slate-100 text-slate-700",
-  received: "bg-blue-100 text-blue-700",
-  in_progress: "bg-amber-100 text-amber-800",
-  completed: "bg-emerald-100 text-emerald-700",
+  received: "bg-koda-teal-light text-koda-navy",
+  in_progress: "bg-koda-coral-50 text-koda-coral-700",
+  completed: "bg-koda-green-100 text-koda-green-700",
 };

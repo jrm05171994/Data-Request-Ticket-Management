@@ -84,7 +84,7 @@ export default async function AdminQueuePage({
       <main className="min-h-screen bg-slate-50">
         <AppHeader />
         <div className="mx-auto max-w-7xl px-6 py-6">
-          <div className="rounded-2xl bg-red-50 p-6 text-sm text-red-800">
+          <div className="rounded-2xl bg-koda-coral-50 p-6 text-sm text-koda-coral-700">
             Could not load tickets: {ticketsError.message}
           </div>
         </div>

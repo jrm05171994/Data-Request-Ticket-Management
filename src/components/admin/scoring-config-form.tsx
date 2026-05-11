@@ -134,10 +134,10 @@ export function ScoringConfigForm({ defaults }: { defaults: ScoringConfigDefault
       </section>
 
       {error ? (
-        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
+        <p className="rounded-lg bg-koda-coral-50 p-3 text-sm text-koda-coral-700">{error}</p>
       ) : null}
       {savedAt && !error ? (
-        <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+        <p className="rounded-lg bg-koda-green-50 p-3 text-sm text-koda-green-700">
           Saved at {savedAt.toLocaleTimeString()}. Every open ticket has been
           rescored and re-ranked.
         </p>

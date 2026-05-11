@@ -23,7 +23,7 @@ export default async function AdminArchivedPage() {
         </div>
 
         {error ? (
-          <div className="mt-4 rounded-2xl bg-red-50 p-6 text-sm text-red-800">
+          <div className="mt-4 rounded-2xl bg-koda-coral-50 p-6 text-sm text-koda-coral-700">
             Could not load archived requests: {error.message}
           </div>
         ) : null}

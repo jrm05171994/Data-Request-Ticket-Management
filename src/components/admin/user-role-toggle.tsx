@@ -45,7 +45,7 @@ export function UserRoleToggle({
       {pending ? (
         <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
       ) : null}
-      {error ? <span className="text-xs text-red-700">{error}</span> : null}
+      {error ? <span className="text-xs text-koda-coral-700">{error}</span> : null}
     </div>
   );
 }

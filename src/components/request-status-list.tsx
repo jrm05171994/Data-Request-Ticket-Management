@@ -40,7 +40,7 @@ export function RequestStatusList({
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
       {highlightId ? (
-        <div className="border-b border-emerald-100 bg-emerald-50 px-6 py-3 text-sm text-emerald-800">
+        <div className="border-b border-koda-green-100 bg-koda-green-50 px-6 py-3 text-sm text-koda-green-700">
           Request submitted. You&apos;ll see status updates here.
         </div>
       ) : null}
@@ -59,7 +59,7 @@ export function RequestStatusList({
             <tr
               key={t.id}
               className={`cursor-pointer transition hover:bg-slate-50 ${
-                t.id === highlightId ? "bg-emerald-50/60" : ""
+                t.id === highlightId ? "bg-koda-green-50/60" : ""
               }`}
             >
               <Td>

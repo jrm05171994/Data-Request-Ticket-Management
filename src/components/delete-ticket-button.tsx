@@ -36,11 +36,11 @@ export function DeleteTicketButton({
         type="button"
         onClick={onClick}
         disabled={pending}
-        className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 shadow-sm transition hover:bg-red-50 disabled:opacity-60"
+        className="btn-danger"
       >
         {pending ? "Archiving…" : label}
       </button>
-      {error ? <p className="text-xs text-red-700">{error}</p> : null}
+      {error ? <p className="text-xs text-koda-coral-700">{error}</p> : null}
     </div>
   );
 }

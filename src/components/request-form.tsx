@@ -273,7 +273,7 @@ export function RequestForm({
       </Field>
 
       {error ? (
-        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
+        <p className="rounded-lg bg-koda-coral-50 p-3 text-sm text-koda-coral-700">{error}</p>
       ) : null}
 
       <div className="flex items-center justify-end gap-3">
@@ -316,7 +316,7 @@ function Field({
     <div className={className}>
       <label htmlFor={htmlFor} className="block text-sm font-medium text-slate-800">
         {label}
-        {required ? <span className="text-red-600"> *</span> : null}
+        {required ? <span className="text-koda-coral"> *</span> : null}
       </label>
       {helper ? <p className="mt-0.5 text-xs text-slate-500">{helper}</p> : null}
       <div className="mt-1.5">{children}</div>

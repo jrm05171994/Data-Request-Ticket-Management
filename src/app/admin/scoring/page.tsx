@@ -21,7 +21,7 @@ export default async function AdminScoringPage() {
         </div>
 
         {error || !config ? (
-          <div className="mt-6 rounded-2xl bg-red-50 p-4 text-sm text-red-800">
+          <div className="mt-6 rounded-2xl bg-koda-coral-50 p-4 text-sm text-koda-coral-700">
             Could not load scoring config: {error?.message ?? "missing row"}
           </div>
         ) : (

@@ -23,7 +23,7 @@ const baseSelect =
 function PendingDot({ pending, error }: { pending: boolean; error: string | null }) {
   if (error) {
     return (
-      <span title={error} className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-red-500" />
+      <span title={error} className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-koda-coral" />
     );
   }
   if (pending) {

@@ -19,31 +19,52 @@ export default async function LoginPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-        <h1 className="text-2xl font-semibold text-slate-900">Koda Data Requests</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Sign in with your Koda Health Google account to continue.
-        </p>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-koda-navy p-6">
+      {/* Decorative background accents */}
+      <div className="pointer-events-none absolute -top-32 -right-24 h-96 w-96 rounded-full bg-koda-teal/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 -left-24 h-96 w-96 rounded-full bg-koda-teal/10 blur-3xl" />
 
-        {searchParams.error ? (
-          <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-            {searchParams.error}
+      <div className="relative z-10 w-full max-w-md">
+        <div className="mb-6 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-koda-teal-light">
+            Koda Health
           </p>
-        ) : null}
+          <h1 className="mt-1 text-3xl font-bold text-white">Data Requests</h1>
+          <p className="mt-1.5 text-sm text-koda-teal-light/80">
+            Internal ticketing for the data team.
+          </p>
+        </div>
 
-        <form action={signInWithGoogle} className="mt-6">
-          <button
-            type="submit"
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            <GoogleLogo />
-            Continue with Google
-          </button>
-        </form>
+        <div className="rounded-2xl bg-white p-8 shadow-2xl ring-1 ring-koda-navy-100">
+          <h2 className="text-lg font-semibold text-koda-navy">Sign in</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Use your Koda Health Google account to continue.
+          </p>
 
-        <p className="mt-6 text-xs text-slate-500">
-          Access is restricted to @kodahealthcare.com accounts.
+          {searchParams.error ? (
+            <p className="mt-4 rounded-lg bg-koda-coral-50 p-3 text-sm text-koda-coral-700">
+              {searchParams.error}
+            </p>
+          ) : null}
+
+          <form action={signInWithGoogle} className="mt-6">
+            <button
+              type="submit"
+              className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-koda-teal hover:bg-koda-teal-50"
+            >
+              <GoogleLogo />
+              Continue with Google
+            </button>
+          </form>
+
+          <p className="mt-6 text-xs text-slate-500">
+            Access is restricted to <span className="font-medium">@kodahealthcare.com</span>{" "}
+            accounts.
+          </p>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-koda-teal-light/60">
+          © {new Date().getFullYear()} Koda Health
         </p>
       </div>
     </main>

@@ -21,7 +21,7 @@ export default async function AdminUsersPage() {
         </div>
 
         {error ? (
-          <div className="mt-4 rounded-2xl bg-red-50 p-4 text-sm text-red-800">
+          <div className="mt-4 rounded-2xl bg-koda-coral-50 p-4 text-sm text-koda-coral-700">
             Could not load users: {error.message}
           </div>
         ) : null}

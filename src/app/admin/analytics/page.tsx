@@ -160,7 +160,7 @@ export default async function AdminAnalyticsPage({
         </div>
 
         {anyError ? (
-          <div className="mt-4 rounded-2xl bg-red-50 p-4 text-sm text-red-800">
+          <div className="mt-4 rounded-2xl bg-koda-coral-50 p-4 text-sm text-koda-coral-700">
             Some analytics failed to load: {anyError.message}
           </div>
         ) : null}
@@ -226,7 +226,7 @@ export default async function AdminAnalyticsPage({
                   label={REQUEST_TYPE_LABELS[row.request_type]}
                   value={Number(row.ticket_count)}
                   max={typeMax}
-                  colorClass="bg-indigo-500"
+                  colorClass="bg-koda-navy"
                   href={queueHref({ types: [row.request_type] }, filters)}
                 />
               ))
@@ -281,7 +281,7 @@ export default async function AdminAnalyticsPage({
                   label={r.full_name ?? r.email}
                   value={Number(r.ticket_count)}
                   max={requesterMax}
-                  colorClass="bg-emerald-500"
+                  colorClass="bg-koda-green"
                   href={queueHref({ requesterId: r.requester_id }, filters)}
                 />
               ))
@@ -337,7 +337,7 @@ export default async function AdminAnalyticsPage({
                           </span>
                         </Td>
                         <Td className="text-right">
-                          <span className="text-sm font-semibold text-red-700">
+                          <span className="text-sm font-semibold text-koda-coral-700">
                             {row.days_late}
                           </span>
                         </Td>
@@ -371,7 +371,7 @@ function Kpi({
     <div
       className={`rounded-2xl p-4 shadow-sm ring-1 transition ${
         tone === "warn"
-          ? "bg-red-50 ring-red-100 hover:ring-red-200"
+          ? "bg-koda-coral-50 ring-koda-coral-100 hover:ring-koda-coral-100/80"
           : "bg-white ring-slate-200 hover:ring-slate-300"
       }`}
     >
@@ -380,7 +380,7 @@ function Kpi({
       </div>
       <div
         className={`mt-1 text-2xl font-semibold tabular-nums ${
-          tone === "warn" ? "text-red-700" : "text-slate-900"
+          tone === "warn" ? "text-koda-coral-700" : "text-koda-navy"
         }`}
       >
         {valueText ?? value?.toLocaleString() ?? 0}
@@ -439,11 +439,11 @@ function stageBarColor(s: Stage): string {
     case "submitted":
       return "bg-slate-400";
     case "received":
-      return "bg-blue-500";
+      return "bg-koda-teal";
     case "in_progress":
-      return "bg-amber-500";
+      return "bg-koda-coral";
     case "completed":
-      return "bg-emerald-500";
+      return "bg-koda-green";
   }
 }
 
