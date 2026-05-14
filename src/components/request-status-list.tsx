@@ -6,7 +6,6 @@ type ListedTicket = {
   id: string;
   request_name: string;
   stage: Stage;
-  priority_rank: number | null;
   expected_completion_date: string | null;
   created_at: string;
   owner: { full_name: string | null; email: string } | null;
@@ -14,11 +13,9 @@ type ListedTicket = {
 
 export function RequestStatusList({
   tickets,
-  totalOpen,
   highlightId,
 }: {
   tickets: ListedTicket[];
-  totalOpen: number;
   highlightId?: string;
 }) {
   if (tickets.length === 0) {
@@ -47,11 +44,11 @@ export function RequestStatusList({
       <table className="min-w-full divide-y divide-slate-200">
         <thead className="bg-slate-50">
           <tr>
-            <Th className="w-24">Rank</Th>
             <Th>Request Name</Th>
             <Th className="w-44">Task Owner</Th>
             <Th className="w-36">Stage</Th>
             <Th className="w-44">Expected Completion</Th>
+            <Th className="w-32">Submitted</Th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
@@ -62,18 +59,6 @@ export function RequestStatusList({
                 t.id === highlightId ? "bg-koda-green-50/60" : ""
               }`}
             >
-              <Td>
-                <Link href={`/requests/${t.id}`} className="block w-full">
-                  {t.priority_rank ? (
-                    <span className="text-sm">
-                      <span className="font-medium text-slate-900">{t.priority_rank}</span>
-                      <span className="text-slate-400"> of {totalOpen}</span>
-                    </span>
-                  ) : (
-                    <span className="text-sm text-slate-400">—</span>
-                  )}
-                </Link>
-              </Td>
               <Td>
                 <Link
                   href={`/requests/${t.id}`}
@@ -105,6 +90,11 @@ export function RequestStatusList({
                   ) : (
                     <span className="text-slate-400">Not set</span>
                   )}
+                </Link>
+              </Td>
+              <Td>
+                <Link href={`/requests/${t.id}`} className="block w-full text-sm text-slate-500">
+                  {formatDate(t.created_at)}
                 </Link>
               </Td>
             </tr>

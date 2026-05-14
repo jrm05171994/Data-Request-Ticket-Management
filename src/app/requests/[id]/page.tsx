@@ -11,6 +11,8 @@ import {
 import { AppHeader } from "@/components/app-header";
 import { DeleteTicketButton } from "@/components/delete-ticket-button";
 import { RestoreTicketButton } from "@/components/admin/restore-ticket-button";
+import { TicketComments } from "@/components/ticket-comments";
+import { listTicketComments } from "@/lib/comments/queries";
 
 export default async function TicketDetailPage({
   params,
@@ -28,18 +30,21 @@ export default async function TicketDetailPage({
     notFound();
   }
 
-  const [{ data: profile }, totalOpen] = await Promise.all([
+  const [{ data: profile }, totalOpen, { data: comments }] = await Promise.all([
     supabase.from("users").select("role").eq("id", user.id).single(),
     getTotalOpenTicketCount(),
+    listTicketComments(ticket.id),
   ]);
 
   const isAdmin = profile?.role === "admin";
   const isArchived = ticket.deleted_at != null;
   const isOwnerSubmitted =
     ticket.requester_id === user.id && ticket.stage === "submitted";
+  const isRequester = ticket.requester_id === user.id;
   const canEdit = !isArchived && (isAdmin || isOwnerSubmitted);
   const canArchive = !isArchived && (isAdmin || isOwnerSubmitted);
   const canRestore = isArchived && isAdmin;
+  const canComment = !isArchived && (isAdmin || isRequester);
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -94,7 +99,7 @@ export default async function TicketDetailPage({
               >
                 {STAGE_LABELS[ticket.stage]}
               </span>
-              {ticket.priority_rank ? (
+              {ticket.priority_rank && isAdmin ? (
                 <span className="text-xs text-slate-500">
                   Rank{" "}
                   <span className="font-semibold text-slate-700">
@@ -168,17 +173,33 @@ export default async function TicketDetailPage({
               </Detail>
             ) : null}
 
-            <Detail label="Priority Score">
-              <span className="font-mono text-slate-700">
-                {Number(ticket.priority_score).toFixed(2)} / 100
-              </span>
-            </Detail>
+            {isAdmin ? (
+              <Detail label="Priority Score">
+                <span className="font-mono text-slate-700">
+                  {Number(ticket.priority_score).toFixed(2)} / 100
+                </span>
+              </Detail>
+            ) : null}
 
             {ticket.completed_at ? (
               <Detail label="Completed">{formatDateTime(ticket.completed_at)}</Detail>
             ) : null}
           </dl>
         </div>
+
+        <TicketComments
+          ticketId={ticket.id}
+          comments={comments ?? []}
+          canPost={canComment}
+          postingDisabledReason={
+            isArchived
+              ? "This request is archived. Restore it to add new comments."
+              : !canComment
+                ? "Comments are limited to the requester and admins."
+                : undefined
+          }
+          currentUserId={user.id}
+        />
       </div>
     </main>
   );

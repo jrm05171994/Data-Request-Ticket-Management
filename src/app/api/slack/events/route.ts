@@ -185,9 +185,7 @@ export async function POST(request: NextRequest) {
   const ticketUrl = appUrl ? `${appUrl}/requests/${ticket.id}` : null;
 
   const lines: string[] = [
-    `Created risk-scoring ticket — *${STAGE_LABELS[ticket.stage]}*${
-      ticket.priority_rank ? ` · rank ${ticket.priority_rank}` : ""
-    }`,
+    `Created risk-scoring ticket — *${STAGE_LABELS[ticket.stage]}*`,
   ];
   if (ticketUrl) lines.push(ticketUrl);
 

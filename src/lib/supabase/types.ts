@@ -69,6 +69,16 @@ type SlackNotificationsRow = {
   payload: Record<string, unknown> | null;
 };
 
+type TicketCommentsRow = {
+  id: string;
+  ticket_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  notified_at: string | null;
+  notification_recipient: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -104,6 +114,16 @@ export type Database = {
           notification_type: string;
         };
         Update: Partial<SlackNotificationsRow>;
+        Relationships: [];
+      };
+      ticket_comments: {
+        Row: TicketCommentsRow;
+        Insert: Partial<TicketCommentsRow> & {
+          ticket_id: string;
+          author_id: string;
+          body: string;
+        };
+        Update: Partial<TicketCommentsRow>;
         Relationships: [];
       };
     };

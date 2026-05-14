@@ -245,6 +245,126 @@ export async function notifyNewRequest({
   return anySent ? { ok: true } : { ok: true, skipped: "no recipients reached" };
 }
 
+// ---------- Comment notifications ----------------------------------------
+
+type CommentTicket = {
+  id: string;
+  request_name: string;
+  requester_id: string;
+  requester: { email: string; full_name: string | null } | null;
+};
+
+type CommentAuthor = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: "admin" | "requester";
+};
+
+/**
+ * DM the appropriate party about a new comment on a ticket.
+ *   - Admin commented  → DM the ticket's requester
+ *   - Requester commented → DM the NEW_REQUEST_NOTIFY_EMAILS recipients
+ *
+ * Never throws. Returns `{ ok: true, skipped }` for soft-fail cases
+ * (recipient not in Slack workspace, requester == admin, etc.). The
+ * caller stamps `ticket_comments.notified_at` based on this result.
+ */
+export async function notifyTicketComment({
+  ticketId,
+  commentBody,
+  author,
+}: {
+  ticketId: string;
+  commentBody: string;
+  author: CommentAuthor;
+}): Promise<NotifyResult & { recipientEmail?: string }> {
+  const supabase = createServiceRoleClient();
+
+  const { data, error } = await supabase
+    .from("tickets")
+    .select(
+      `id, request_name, requester_id,
+       requester:requester_id ( email, full_name )`,
+    )
+    .eq("id", ticketId)
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+  const ticket = data as unknown as CommentTicket | null;
+  if (!ticket) return { ok: false, error: "ticket not found" };
+
+  // Who do we DM?
+  let recipientEmails: string[] = [];
+  if (author.role === "admin") {
+    // Admin asked a question → notify the requester.
+    if (ticket.requester?.email) {
+      recipientEmails = [ticket.requester.email];
+    }
+  } else {
+    // Requester replied → notify the new-request recipients (Ryan by default).
+    recipientEmails = getNewRequestRecipients();
+  }
+
+  if (recipientEmails.length === 0) {
+    return { ok: true, skipped: "no recipients configured" };
+  }
+
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
+  const ticketUrl = appUrl ? `${appUrl}/requests/${ticketId}` : null;
+
+  const authorLabel = author.full_name ?? author.email;
+  const text = [
+    `*New comment on "${escapeText(ticket.request_name)}"*`,
+    `From *${escapeText(authorLabel)}*${author.role === "admin" ? " (admin)" : ""}:`,
+    `> ${escapeText(commentBody).split("\n").join("\n> ")}`,
+    ticketUrl ?? "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  let anySent = false;
+  let firstRecipient: string | undefined;
+
+  for (const email of recipientEmails) {
+    // Don't DM the comment's author themselves
+    if (email.toLowerCase() === author.email.toLowerCase()) continue;
+
+    let slackUserId: string | null = null;
+    try {
+      const lookup = await slack().users.lookupByEmail({ email });
+      slackUserId = lookup.user?.id ?? null;
+    } catch (err) {
+      console.warn("comment lookupByEmail miss", email, errMessage(err));
+      continue;
+    }
+    if (!slackUserId) continue;
+
+    try {
+      await slack().chat.postMessage({ channel: slackUserId, text });
+      anySent = true;
+      if (!firstRecipient) firstRecipient = email;
+    } catch (err) {
+      console.error("comment DM failed", email, errMessage(err));
+      continue;
+    }
+
+    try {
+      await supabase.from("slack_notifications").insert({
+        ticket_id: ticketId,
+        slack_user_id: slackUserId,
+        notification_type: "comment",
+        payload: { recipient_email: email, body: commentBody, author_role: author.role },
+      });
+    } catch (logErr) {
+      console.error("comment audit log failed", errMessage(logErr));
+    }
+  }
+
+  if (!anySent) return { ok: true, skipped: "no recipients reached" };
+  return { ok: true, recipientEmail: firstRecipient };
+}
+
 function errMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);

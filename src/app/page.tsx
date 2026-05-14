@@ -5,7 +5,7 @@ import { AppHeader } from "@/components/app-header";
 import { RequestForm } from "@/components/request-form";
 import { createTicket } from "@/app/actions/tickets";
 import { RequestStatusList } from "@/components/request-status-list";
-import { listMyTickets, getTotalOpenTicketCount } from "@/lib/tickets/queries";
+import { listMyTickets } from "@/lib/tickets/queries";
 
 type SearchParams = { tab?: string; created?: string };
 
@@ -59,10 +59,7 @@ async function StatusTab({
   userId: string;
   highlightId?: string;
 }) {
-  const [{ data: tickets, error }, totalOpen] = await Promise.all([
-    listMyTickets(userId),
-    getTotalOpenTicketCount(),
-  ]);
+  const { data: tickets, error } = await listMyTickets(userId);
 
   if (error) {
     return (
@@ -75,7 +72,6 @@ async function StatusTab({
   return (
     <RequestStatusList
       tickets={tickets ?? []}
-      totalOpen={totalOpen}
       highlightId={highlightId}
     />
   );

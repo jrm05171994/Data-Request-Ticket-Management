@@ -180,9 +180,7 @@ export async function POST(request: NextRequest) {
       channel: slackUserId,
       text: `Got your request "*${escapeText(requestName)}*" — ${
         STAGE_LABELS[ticket.stage]
-      }${ticket.priority_rank ? ` · rank ${ticket.priority_rank}` : ""}${
-        ticketUrl ? `\n${ticketUrl}` : ""
-      }`,
+      }${ticketUrl ? `\n${ticketUrl}` : ""}`,
     });
   } catch (dmErr) {
     console.error("DM confirmation failed", dmErr);
